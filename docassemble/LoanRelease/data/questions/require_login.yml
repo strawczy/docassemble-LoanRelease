@@ -1,0 +1,12 @@
+initial: true
+code: |
+  if not user_logged_in():
+    kick_out_user
+---
+event: kick_out_user
+question: |
+  You must be logged in to use this interview.
+buttons:
+  - Log in: signin
+  - Exit: exit
+---

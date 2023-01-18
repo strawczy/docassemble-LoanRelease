@@ -1,0 +1,723 @@
+metadata:
+  title: |
+    Legal - Customer Release
+  short title: |
+    Release
+  description: |
+    Prepare a customer release suitable for use where there is a dispute
+    over the terms of the contract or over property (water) damage.
+  authors:
+    - name: Oscar Strawczynski
+      organization: Simply Group
+---
+imports:
+  - os
+  - json
+---
+features:
+  cache documents: False
+  debug: True
+---
+include:
+  - require_login.yml
+---
+objects from file:
+    - eligible_signatories: eligible_signatories.json
+---
+code: |
+  version = "202211.1"
+---
+mandatory: True
+code: |
+  multi_user = True
+  set_live_help_status(availability='available', mode='help', partner_roles=['Legal'])
+  intro_seen
+  remember_original_user
+  draft_release
+  set_parts(subtitle = str(release.service_address) )
+  
+  #store_variables_snapshot(persistent=True)
+  if not use_simple_release:
+    signature_obtained
+  document_shown
+  done
+---
+code: |
+  release_name = format_date(release.effective_date,format="yyyy-MM-dd") + " " + release.clients[0].name.last + ' Release'
+---
+question: Review Release
+subquestion: |
+  Please review the release prepared for signature by ${release.signatory}.
+
+  ${draft_release}
+
+fields:
+  - Do you have any comments you wish to share with ${release.signatory} about this Release?: additional_comment
+    required: False
+    input type: area
+continue button field: review_shown
+---
+template: release_description
+content: |
+  % if lease:
+  % if not use_simple_release:
+
+  The release is effective ${release.effective_date} between ${client_name} and ${release.company} in respect of ${ release.service_address} where ${release.company} supplied ${release.equipment}.
+
+  % if release.leak_liability:
+
+  This is a leak case.  There is ${currency(release.payment)} being made to the ${client_identifier} and the lease is being terminated.
+
+  % else:
+
+  % if release.arrears_waived:
+  * ${release.company} is waiving arrears,
+
+  %endif
+  % if release.payment > 0:
+  * ${client_identifier} will pay ${currency(release.payment)}
+  % if release.payment_mechanism:
+  by ${ comma_and_list(release.payment_mechanism,and_string="or") }
+  % endif
+  % endif
+
+  % if release.equipment_return:
+  * The customer will return the equipment
+
+  % else:
+  * The customer will keep the equipment
+
+  %endif
+  % if release.lawsuit:
+  * The 
+  % if release.collection_claim:
+  company
+  % else:
+  customer
+  % endif
+  will end the lawsuit known as ${ release.court_file_number } commenced at ${release.court_location }
+
+  % endif
+  % if release.remove_nosi:
+  * ${release.company} will remove the NOSI registration
+  % if defined('release.discharge_deadline'):
+  within ${release.discharge_deadline} business days
+  %endif
+  .
+  %endif
+
+  %endif
+  %endif
+  % else:
+  Loan release for ${client_name} and ${release.company}
+  % endif
+---
+question: Please sign this document.
+subquestion: |
+  Please review and sign this document.
+
+  ${ release_description }
+
+  ${ draft_release.pdf }
+field: agrees_to_sign
+buttons:
+  - Sign the release: True
+  - Needs amendment: False
+---
+question: Is this a collection claim by ${release.company}?
+yesno: release.collection_claim
+---
+question: Finalized Document
+subquestion: |
+  Here is the finalized document.
+
+  ${bold("Please download or email this document before pressing continue")}
+
+attachment code: |
+ [simple_release if use_simple_release else signed_mutual_release]
+continue button field: show_signed_document
+---
+code: |
+  if user_is_signatory:
+     signature_requested = True
+  else:
+    send_email(to=release.signatory.email,template=request_signature_email)
+    signature_requested = True
+    prevent_going_back()
+    force_ask('screen_requested')
+---
+event: done
+question: "Thanks for using the release maker"
+subquestion: |
+  ${release_name} has been sent.
+buttons:
+  - Prepare a fresh release: new_session
+  - Exit: exit
+---
+objects:
+  - release: DAObject
+  - release.clients: DAList.using(object_type=Individual,minimum_number=1)
+---
+question: Intro
+subquestion: |
+  This interview will allow you to prepare a customer release for signature.
+
+  The completed release will be forwarded to the internal signing officer of your choice for signature, and you will receive an email when the document is signed.
+
+  If you are the internal signing officer, you will not be emailed the document, but you will be asked to sign and download it.
+continue button field: intro_seen
+---
+question: What does this release apply to?
+fields:
+  - "Service Address": release.service_address
+---
+question: Is there ongoing litigation?
+yesno: release.lawsuit
+---
+question: What kind of lawsuit is ${release.court_file_number}?
+field: release.lawsuit_type
+buttons:
+  - Action
+  - Application
+---
+if: release.small_claims
+code:
+  release.lawsuit_type = 'Action'
+---
+question: What are the details of the litigation?
+fields:
+   - "Small Claims Court file": release.small_claims
+     datatype: yesnowide
+   - "Court File Number": release.court_file_number
+   - "Court Location": release.court_location
+   - "Province": release.court_province
+     choices:
+        - ON
+        - BC
+        - AB
+        - SK
+        - MB
+        - QC
+        - NB
+        - NS
+        - PEI
+        - NL
+        - NU
+        - YT
+        - NWT
+---
+question: Will ${release.company} be removing a Notice of Security Interest?
+yesno: release.remove_nosi
+---
+question: Was the ${release.equipment } removed?
+yesno: equipment_removed
+---
+question: Was the customer's account subsequently assigned to Reliance?
+yesno: release_assigned
+---
+question: Did the the ${client_identifier} involve an insurer?
+yesno: subrogated_claim
+---
+if: release.lawsuit
+question: Does the lawsuit name companies other than ${release.company}?
+yesno: other_companies_sued
+---
+if not: release.lawsuit
+code: |
+  other_companies_sued = False
+---
+question: What is the name of the insurance company?
+fields: 
+  - Insurer: insurer
+---
+question: What other companies besides {release.company} were sued?
+field: other_companies
+---
+question: |
+  What is the nature of the dispute?
+field: release.leak_liability
+buttons:
+  - Contract Dispute: false
+  - Water Damage: true
+---
+question: |
+  Did the ${client_identifier} terminate the contract for the ${release.equipment}?
+subquestion: |
+  If the ${client_identifier} upgraded to new equipment to replace the equipment which caused damage, answer "Yes".
+yesno: release.contract_terminated
+---
+question: Did the ${client_identifier} transfer the property to new owners?
+field: release.after_sale
+buttons:
+  - Yes: True
+  - No: False
+---
+objects:
+  - equipment_list_temp: DAList.using(auto_gather=False,gathered=True)
+---
+need: equipment_dict
+code: |
+  for key in equipment_dict.keys():
+     if equipment_dict[key]:
+       equipment_list_temp.append(key)
+  release.equipment = equipment_list_temp.comma_and_list()
+---
+question: What equipment at ${release.service_address} does this Release apply to?
+fields:
+  - "Select the applicable equipment": equipment_dict
+    datatype: checkboxes
+    none of the above: false
+    minlength: 1
+    choices:
+      - Air Conditioner: Air Conditioner
+      - Boiler: Boiler
+      - Carbon Filter: Carbon Filter
+      - Combo Unit: Combo Unit
+      - Detergent-less Laundry System: Detergent-less Laundry System
+      - Electronic Air Cleaner (Not HEPA): Electronic Air Cleaner
+      - Furnace: Furnace
+      - Heat Pump: Heat Pump
+      - HEPA Filter: HEPA Filter
+      - HRV: HRV
+      - Humidifier: Humidifier
+      - Tankless Water Heater: Tankless Water Heater
+      - Water Heater: Water Heater
+      - Water Softener: Water Softener
+      - Water Treatment System: Water Treatment System
+---
+question: Clients at ${release.service_address}
+subquestion: |
+  You have told me about the following clients:
+
+  % for client in release.clients.complete_elements():
+    * ${client}
+  % endfor
+
+  Is there another?
+yesno: release.clients.there_is_another
+---
+question: How many clients are there at ${release.service_address}?
+fields:
+  - Number: release.clients.target_number
+    datatype: integer
+    min: 1
+---
+question: |
+  What is the name of the ${ ordinal(i) } client?
+fields:
+  - First name: release.clients[i].name.first
+  - Middle name: release.clients[i].name.middle
+    required: False
+  - Last name: release.clients[i].name.last
+  - Is represented by power of attorney: release.clients[i].is_represented
+    datatype: yesno
+  - Is represented by estate trustee: release.clients[i].is_estate
+    datatype: yesno
+  - ${ capitalize(ordinal(i)) } client's gender: release.clients[i].gender
+    js show if: val("release.clients[i].is_represented") || val("release.clients[i].is_estate")
+    choices:
+      - male
+      - female
+      - other    
+  - Power of Attorney name: release.clients[i].attorney
+    show if: release.clients[i].is_represented
+  - Estate Trustee name: release.clients[i].estate_trustee
+    show if: release.clients[i].is_estate
+---
+question: |
+  Will the ${release.equipment} be returned to ${release.company}?
+yesno: release.equipment_return
+---
+question: What is the date this release will take effect?
+fields:
+  - "Effective Date": release.effective_date
+    datatype: date
+    default: ${ today() }
+---
+---
+if: not lease
+question: Which company made the loan to the ${client_identifier}?
+fields:
+  - "Company": release.company
+    choices:
+       - Simply Group Financial Corp.
+       - Ecohome Financial Inc.
+       - One Dealer Financial Inc.
+       - Snap Home Finance Corp.
+---
+if: lease
+question: Which company is leasing the equipment?
+fields:
+  - "Company": release.company
+    choices:
+      - Simply Green Home Services Inc.
+      - Simply Green Home Services Corp. (formerly Inc.): Simply Green Home Services Corp.
+      - Crown Crest Capital Corp.
+      - Crown Crest Financial Corp.
+      - Crown Crest Funding Corp. (in its capacity as trustee for Crown Crest Capital Trust)
+      - EcoHome Financial Inc.
+      - OneDealer Financial Services Inc.
+      - Sandpiper Energy Solutions
+      - Crown Crest Capital Management Corp.
+      - HCSI Home Comfort Inc.
+      - Utilebill Home Services Inc. 
+---
+code: |
+  if (release.company == "Ecohome Financial Inc.") or (release.company == "OneDealer Financial Services Inc."):
+    release.company_address = "130 King Street West, Suite 501, Toronto, Ontario, M5X 1C7"
+  else:
+    release.company_address = "2225 Sheppard Avenue East, Suite 800 Toronto, Ontario M2J 5C2"
+---
+question: Who will sign for ${release.company}?
+subquestion: The person you choose here will be emailed the release for signature.
+fields:
+  - "Signing officer": release.signatory
+    datatype: object
+    choices: eligible_signatories
+---
+question: What compensation is being paid as part of the release?
+subquestion: |
+  *If none, enter zero*
+fields:
+  - Payment by ${release.company} to ${client_identifier}: release.payment
+    datatype: currency
+    default: 0
+    min: 0
+    show if:
+      code: release.leak_liability
+  - Payment by ${client_identifier} to ${release.company}: release.payment
+    datatype: currency
+    default: 0
+    min: 0
+    hide if:
+      code: release.leak_liability      
+  - Payment Details: payment_details
+    datatype: radio
+    choices:
+      - to be paid by a certain date
+      - to be paid within a certain number of days
+      - to be paid in equal monthly payments
+      - no payment details specified
+    hide if:
+       code: release.leak_liability
+---
+question: "How many days does the customer have to pay?"
+fields:
+  - Days to pay: payment_days
+    datatype: integer
+    min: 1
+---
+question: "What date is the payment due by?"
+fields:
+  - Payment Due Date: payment_date
+    datatype: date
+---
+question: "What are the details of the payment plan?"
+fields:
+  - Number of equal monthly installments: monthly_installments
+    datatype: integer
+    min: 1
+  - Payment start date: payment_start_date
+    datatype: date
+---
+code: |
+  if payment_details == "no payment details specified":
+     release.payment_details = ""
+  elif payment_details == "to be paid in equal monthly payments":
+    release.payment_details = " payable in " + str(monthly_installments) + " equal monthly installments starting " + format_date(payment_start_date)
+  elif payment_details == "to be paid within a certain number of days":
+    release.payment_details = " to be paid within " + str(payment_days) + " days"
+  else:
+    release.payment_details = " to be paid by " + format_date(payment_date)
+---
+if: release.payment <= 0
+question: Payment arrears
+subquestion: |
+  Will ${release.company} be waiving arrears as part of the settlement?
+yesno: release.arrears_waived
+---
+if: release.payment > 0
+code: |
+  release.arrears_waived = False
+---
+question: Equipment removal
+subquestion:
+  Was the ${release.equipment} removed from ${release.service_address}?
+yesno: release.equipment_removed
+---
+question: Payment mechanism
+subquestion: |
+  How can the customer pay the settlement amount?
+  
+  *If there are no restrictions on how the settlement may be paid, choose* "None of the above"
+fields:
+  - no label: payment_mechanism
+    datatype: checkboxes
+    choices:
+      - cheque
+      - certified cheque
+      - draft
+      - wire transfer
+      - cheque drawn on lawyer's trust account
+---
+code: |
+  release.payment_mechanism = [k for k in payment_mechanism.keys() if payment_mechanism[k]]
+---
+question: Will we be providing a copy of the NOSI discharge to the customer?
+yesno: release.provide_discharge
+---
+question: |
+  How many business days after
+  % if release.payment:
+  payment is received
+  % else:
+  the release is return to us
+  % endif
+  will we provide the NOSI discharge?
+subquestion: |
+  We require a minimum of ten business days days to process a discharge in Ontario and 20 days in other jurisdictions.
+fields:
+ - no label: release.discharge_deadline
+   datatype: integer
+   default: 10
+   min: 5
+---
+question: Origination or Financing
+subquestion: |
+   Did ${release.company} acquire any of the leases for the ${release.equipment}, or did it originate all of the subject leases?
+field: release.sg_is_assignee
+buttons:
+  - Acquired some contracts: True
+  - Originated all contracts: False
+---
+objects:
+ - signatory_detail: Individual
+---
+code: |
+  client_name = release.clients.comma_and_list()
+  client_plural = release.clients.number_gathered() > 1
+  client_identifier = "Clients" if client_plural else "Client"
+---
+code: |
+  use_simple_release = release.leak_liability and not release.contract_terminated
+---
+reconsider: true
+code: |
+  draft_release = simple_release if use_simple_release else (mutual_release if lease else loan_release) 
+---
+question: Is this release for a lease or a loan?
+field: lease
+buttons:
+  - Lease: True
+  - Loan: False
+---
+reconsider: true
+code: |
+  signed_release = simple_release if use_simple_release else mutual_release
+---
+reconsider: true
+code: |
+  equipment_plural = equipment_list_temp.number() > 1
+---
+attachment:
+  - name: release
+    filename: release
+    variable name: simple_release
+    docx template file: simple_release.docx
+    valid formats:
+      - pdf
+      - docx
+---
+reconsider: True
+attachment:
+  - name: release
+    filename: ${release_name}
+    variable name: mutual_release
+    docx template file:
+      code: |
+        'release.v2.docx' if not defined('revised_release') else revised_release
+    valid formats:
+      - pdf
+      - docx
+---
+reconsider: True
+attachment:
+  - name: release_docx
+    filename: ${release_name}
+    variable name: mutual_release_for_review
+    docx template file:
+      code: |
+        ('release.v2.docx' if lease else 'loan.release.docx') if not defined('revised_release') else revised_release
+    valid formats:
+      - docx
+---
+
+reconsider: True
+attachment:
+  - name: loan_release
+    filename: ${release_name}
+    variable name: loan_release
+    docx template file:
+      code: |
+        'loan.release.docx' if not defined('revised_release') else revised_release
+    valid formats:
+      - docx
+      - pdf
+---
+attachment:
+  filename: ${release_name}
+  variable name: signed_mutual_release
+  valid formats:
+    - pdf
+    - docx
+  docx template file:
+    code: |
+      ('release.v2.docx' if lease else 'loan.release.docx') if not defined('revised_release') else revised_release
+---
+code: |
+  if not user_is_signatory:
+    review_shown
+  else:
+    additional_comment = None
+---
+reconsider: True
+only sets: signature_obtained
+code: |
+  signature_requested
+  if agrees_to_sign:
+    signature_reset
+    signature
+    signature_obtained = True
+  else:
+    signature_exception
+    undefine('draft_release')
+    undefine('agrees_to_sign')
+    undefine('mutual_release')
+    undefine('release_to_review')
+    signature_obtained = False
+    revision_uploaded
+---
+continue button field: revision_uploaded
+question: Please upload the revised document
+subquestion: |
+
+  Upload the edited release to complete the approval flow.
+
+fields:
+ - Revised release: revised_release
+   datatype: file
+   accept: |
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+---
+continue button field: signature_exception
+question: Document for further review
+subquestion: |
+
+  Please download and review [this draft release](${mutual_release_for_review.url_for(attachment=True)}).
+
+  You may re-submit the edited release to complete the approval flow.
+  
+---
+code: |
+  del signature
+  signature_reset = True
+---
+code: |
+  original_user = user_info()
+  prepared_by_manager = user_has_privilege('Legal Department')
+  remember_original_user = True
+---
+code: |
+  if use_simple_release or user_is_signatory:
+    show_signed_document
+  else:
+    send_email(to=original_user.email, cc=release.signatory.email, template=email_template, attachments=signed_mutual_release.pdf)
+  document_shown = True
+---
+code: |
+  user_is_signatory = str(release.signatory.email).lower() == str(user_info().email).lower()
+---
+event: screen_requested
+question: Signature requested
+subquestion: |
+  ${release.signatory} has been asked to sign the release.
+
+  You will receive an email when it is done.
+---
+template: request_signature_email
+subject: Please sign this Release
+content: |
+  ${original_user} has prepared a release for your signature.
+
+  ${ release_description }
+  
+  % if additional_comment:
+
+  ${original_user} had the following additional comments:
+
+  > ${additional_comment}
+
+  % endif
+
+  Please sign [here]
+
+  [here]: ${interview_url()}
+
+---
+only sets: get_signature
+continue buttton field: get_signature
+signature: signature
+question: Sign your name
+---
+objects:
+  - existing_signature: DAStaticFile.using(filename=user_info().first_name.lower() + '_signature_small.png')
+---
+code: |
+    if not defined('draft_release'):
+      signature = '{{ signature }}'
+    elif os.path.exists(existing_signature.path()):
+      signature = existing_signature
+    else:
+      get_signature
+---
+template: email_template
+subject: "Signed document: ${release_name}"
+content: |
+  The attached document has been signed.
+---
+if: prepared_by_manager
+question: Will we seek a release from the pending proposed class actions?
+yesno: class_release
+---
+if: not prepared_by_manager
+code: |
+  class_release = False
+---
+question: |
+  Did the customers commence a Defendant's Claim?
+yesno: release.has_defendants_claim
+---
+question: What is the loan agreement date?
+fields:
+  Agreement Date: release.loan_agreement_date
+  datatype: date
+---
+question: What province is the customer in?
+fields:
+  Province: release.governing_law_province
+  choices:
+     - Ontario
+     - British Columbia
+     - Alberta
+     - Manitoba
+     - Saskatchewan
+     - Quebec
+     - New Brunswick
+     - Nova Scotia
+     - Prince Edward Island
+     - Newfoundland and Labrador
+     - Nunavut
+     - Northwest Territories
+     - Yukon
+     - 
+  

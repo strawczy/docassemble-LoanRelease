@@ -1,0 +1,66 @@
+mandatory: True
+code: |
+  signature = '{{signature}}'
+---
+objects:
+ - signatory_detail: Individual
+---
+code: |
+  client_name = release.clients.comma_and_list()
+  client_plural = release.clients.number_gathered() > 1
+  client_identifier = "Clients" if client_plural else "Client"
+---
+code: |
+  use_simple_release = release.leak_liability and not release.contract_terminated
+---
+code: |
+  draft_release = simple_release if use_simple_release else mutual_release
+---
+reconsider: true
+code: |
+  signed_release = simple_release if use_simple_release else mutual_release
+---
+reconsider: true
+code: |
+  equipment_plural = equipment_list_temp.number() > 1
+---
+attachment:
+  - name: release
+    filename: release
+    variable name: simple_release
+    docx template file: simple_release.docx
+    valid formats:
+      - pdf
+      - docx
+---
+reconsider: True
+attachment:
+  - name: release
+    filename: ${release_name}
+    variable name: mutual_release
+    docx template file: 
+      code: |
+        'release.v2.docx' if not defined('revised_release') else revised_release
+    valid formats:
+      - pdf
+      - docx
+---
+reconsider: True
+attachment:
+  - name: release_docx
+    filename: ${release_name}
+    variable name: mutual_release_for_review
+    docx template file:
+      code: |
+        'release.v2.docx' if not defined('revised_release') else revised_release
+    valid formats:
+      - docx
+---
+attachment:
+  filename: ${release_name}
+  variable name: signed_mutual_release
+  valid formats:
+    - pdf
+    - docx
+  docx template file: release.v2.docx
+---

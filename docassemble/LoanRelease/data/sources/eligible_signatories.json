@@ -1,0 +1,51 @@
+{
+    "object": "Individual",
+    "module": "docassemble.base.util",
+    "items": [
+        {
+            "name": {
+                "object": "IndividualName",
+                "module": "docassemble.base.util",
+                "item": {
+                    "first": "Oscar",
+                    "last": "Strawczynski"
+                }
+            },
+            "email": "oscar.strawczynski@mysimplygroup.com"
+        },
+        {
+            "name": {
+                "object": "IndividualName",
+                "module": "docassemble.base.util",
+                "item": {
+                    "first": "Andrew",
+                    "last": "Bowgen"
+                }
+            },
+            "email": "andrew.bowgen@mysimplygroup.com"
+        },
+        {
+            "name": {
+                "object": "IndividualName",
+                "module": "docassemble.base.util",
+                "item": {
+                    "first": "Akm",
+                    "last": "Hossen"
+                }
+            },
+            "email": "akm.hossen@mysimplygroup.com"
+        },
+        {
+            "name": {
+                "object": "IndividualName",
+                "module": "docassemble.base.util",
+                "item": {
+                    "first": "Umta",
+                    "last": "Shino"
+                }
+            },
+            "email": "umta.shino@mysimplygroup.com"
+        }
+        
+    ]
+}

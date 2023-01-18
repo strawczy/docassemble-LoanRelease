@@ -1,0 +1,21 @@
+code: |
+    class_release = False
+    client_identifier = "Client"
+    client_name = "Oscar Strawczynski"
+    client_plural = False
+    equipment_plural = False
+    intro_seen = True
+    key = "Water Treatment System"
+    release.after_sale = False
+    release.arrears_waived = True
+    release.company = "Simply Green Home Services Inc."
+    release.discharge_deadline = 10
+    release.equipment = "Boiler"
+    release.equipment_return = False
+    release.leak_liability = False
+    release.payment = 1000.0
+    release.payment_mechanism = [ "cheque" ]
+    release.provide_discharge = True
+    release.remove_nosi = True
+    release.service_address = "1 Way Street"
+    release.sg_is_assignee = True

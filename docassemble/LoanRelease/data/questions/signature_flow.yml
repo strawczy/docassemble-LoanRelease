@@ -1,0 +1,114 @@
+initial: True
+code: |
+  multi_user = True
+---
+code: |
+  if not user_is_signatory:
+    review_shown
+  else:
+    additional_comment = None
+---
+reconsider: True
+only sets: signature_obtained
+code: |
+  signature_requested
+  if agrees_to_sign:
+    signature_reset
+    signature
+    signature_obtained = True
+  else:
+    signature_exception
+    undefine('draft_release')
+    undefine('agrees_to_sign')
+    undefine('mutual_release')
+    agrees_to_sign = True
+    signature_obtained = False
+    revision_uploaded
+---
+continue button field: revision_uploaded
+question: Please upload the revised document
+subquestion: |
+
+  Upload the edited release to complete the approval flow.
+ 
+fields:
+ - Revised release: revised_release
+   datatype: file
+   accept: |
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+---
+continue button field: signature_exception
+question: Document for further review
+subquestion: |
+
+  Please download and review the attached document.
+
+  You may re-submit the edited release to complete the approval flow.
+  
+attachment code: |
+    mutual_release_for_review
+---
+code: |
+  del signature
+  signature_reset = True
+---
+code: |
+  original_user = user_info()
+  remember_original_user = True
+---
+code: |
+  if use_simple_release or user_is_signatory:
+    show_signed_document
+  else:
+    send_email(to=original_user.email, cc=release.signatory.email, template=email_template, attachments=signed_mutual_release.pdf)
+  document_shown = True
+---
+code: |
+  user_is_signatory = str(release.signatory.email).lower() == str(user_info().email).lower()
+---
+event: screen_requested
+question: Signature requested
+subquestion: |
+  ${release.signatory} has been asked to sign the release.
+
+  You will receive an email when it is done.
+buttons:
+  - Quit and wait for email: new_session
+---
+template: request_signature_email
+subject: Please sign this Release
+content: |
+  ${original_user} has prepared {$release_name} for your signature.
+
+  % if additional_comment:
+
+  ${original_user} had the following additional comments:
+
+  > ${additional_comment}
+
+  % endif
+
+  Please sign [here]
+
+  [here]: ${interview_url()}
+
+---
+only sets: get_signature
+continue buttton field: get_signature
+signature: signature
+question: Sign your name
+---
+objects:
+  - existing_signature: DAStaticFile.using(filename=user_info().first_name.lower() + '_signature_small.png')
+---
+code: |
+    if os.path.exists(existing_signature.path()):
+      signature = existing_signature
+    else:
+      get_signature
+---
+template: email_template
+subject: Signed document
+content: |
+  The attached document has been signed.
+---
